@@ -144,6 +144,7 @@ export default function AccountsPage() {
                 data: {
                   name: form.name,
                   color: form.color,
+                  balance: isBalanceManagedAccount(form.type) ? form.balance : undefined,
                   linkedDepositAccountId: form.linkedDepositAccountId,
                   archived: form.archived,
                 },
@@ -239,15 +240,20 @@ function AccountForm({
             </div>
           </div>
         )}
-        {!account && isBalanceManagedAccount(form.type) && (
+        {isBalanceManagedAccount(form.type) && (
           <div>
-            <label className="text-xs font-semibold text-slate-500">초기 잔액</label>
+            <label className="text-xs font-semibold text-slate-500">{account ? '현재 잔액' : '초기 잔액'}</label>
             <input
               type="number"
               value={form.balance}
               onChange={(e) => setForm({ ...form, balance: Number(e.target.value) })}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 mt-1"
             />
+            {account && (
+              <div className="text-[11px] text-slate-500 mt-1">
+                거래 수정 오류 등으로 잔액이 어긋났을 때 실제 잔액으로 보정할 수 있습니다.
+              </div>
+            )}
           </div>
         )}
         {!isBalanceManagedAccount(form.type) && (

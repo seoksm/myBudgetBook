@@ -26,6 +26,7 @@ public class AccountDto {
             String color,
             Integer statementDay,
             Integer paymentDay,
+            Long balance,
             Integer sortOrder,
             Boolean archived,
             Long linkedDepositAccountId

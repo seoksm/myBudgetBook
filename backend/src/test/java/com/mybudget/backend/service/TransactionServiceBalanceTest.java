@@ -110,4 +110,69 @@ class TransactionServiceBalanceTest {
         assertThat(savedPrevious.getBalance()).isEqualTo(100_000L);
         assertThat(savedNext.getBalance()).isEqualTo(18_000L);
     }
+
+    @Test
+    void updateLegacyCheckCardTransactionWithoutBalanceAccountRevertsLinkedDeposit() {
+        User user = userRepo.save(User.builder()
+                .email("legacy-check-card-balance@example.com")
+                .passwordHash("hash")
+                .displayName("legacy-check-card")
+                .build());
+        AuthContext.setUser(user);
+
+        Account livingExpense = accountRepo.save(Account.builder()
+                .user(user)
+                .name("생활비통장")
+                .type(AccountType.DEPOSIT)
+                .balance(90_000L)
+                .currency("KRW")
+                .archived(false)
+                .sortOrder(1)
+                .build());
+        Account checkCard = accountRepo.save(Account.builder()
+                .user(user)
+                .name("생활비 체크카드")
+                .type(AccountType.CHECK_CARD)
+                .linkedDepositAccount(livingExpense)
+                .balance(0L)
+                .currency("KRW")
+                .archived(false)
+                .sortOrder(2)
+                .build());
+        Category category = categoryRepo.save(Category.builder()
+                .user(user)
+                .name("식비")
+                .kind(CategoryKind.EXPENSE)
+                .archived(false)
+                .sortOrder(1)
+                .build());
+
+        Transaction legacy = transactionRepo.save(Transaction.builder()
+                .user(user)
+                .kind(TransactionKind.EXPENSE)
+                .amount(10_000L)
+                .account(checkCard)
+                .balanceAccount(null)
+                .category(category)
+                .memo("legacy check card")
+                .occurredAt(LocalDateTime.of(2026, 5, 20, 9, 0))
+                .source(TransactionSource.MANUAL)
+                .build());
+
+        transactionService.update(legacy.getId(), new TransactionDto.UpdateRequest(
+                TransactionKind.EXPENSE,
+                12_000L,
+                checkCard.getId(),
+                category.getId(),
+                "updated check card",
+                LocalDateTime.of(2026, 5, 20, 10, 0),
+                Set.of()
+        ));
+
+        Account savedLivingExpense = accountRepo.findById(livingExpense.getId()).orElseThrow();
+        Transaction savedTransaction = transactionRepo.findById(legacy.getId()).orElseThrow();
+
+        assertThat(savedLivingExpense.getBalance()).isEqualTo(88_000L);
+        assertThat(savedTransaction.getBalanceAccount().getId()).isEqualTo(livingExpense.getId());
+    }
 }

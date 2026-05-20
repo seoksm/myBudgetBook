@@ -21,6 +21,7 @@ export const createAccount = (data: {
 export const updateAccount = (id: number, data: {
   name: string;
   color?: string;
+  balance?: number;
   archived?: boolean;
   linkedDepositAccountId?: number;
 }) =>

@@ -102,6 +102,9 @@ public class TransactionService {
                 ? categoryRepo.findByIdAndUserId(req.categoryId(), user.getId())
                     .orElseThrow(() -> new NotFoundException("Category", req.categoryId()))
                 : null;
+        if (newCategory == null) {
+            throw new BusinessException("CATEGORY_REQUIRED", "수입/지출 거래는 카테고리가 필수입니다");
+        }
 
         t.setKind(req.kind());
         t.setAmount(req.amount());
@@ -165,7 +168,7 @@ public class TransactionService {
      *   EXPENSE   →  잔액 - amount
      *   체크카드 지출은 거래 계좌가 아니라 balanceAccount(연결 예금)의 잔액을 조정
      *   신용카드와 체크카드 자체 계좌는 잔액을 관리하지 않음
-     *   balanceAccount 도입 전 거래는 account를 잔액 반영 계좌로 보정
+     *   balanceAccount 도입 전 거래는 계좌 유형에 맞춰 잔액 반영 계좌를 보정
      */
     private void applyBalance(Transaction transaction, int sign) {
         Account account = resolveAppliedBalanceAccount(transaction);
@@ -187,6 +190,14 @@ public class TransactionService {
         }
 
         Account account = transaction.getAccount();
+        if (account != null
+                && transaction.getKind() == TransactionKind.EXPENSE
+                && account.getType() == AccountType.CHECK_CARD) {
+            Account linkedDeposit = account.getLinkedDepositAccount();
+            if (linkedDeposit != null && isBalanceManaged(linkedDeposit.getType())) {
+                return linkedDeposit;
+            }
+        }
         if (account != null && isBalanceManaged(account.getType())) {
             return account;
         }

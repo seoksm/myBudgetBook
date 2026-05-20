@@ -72,6 +72,9 @@ public class AccountService {
         if (req.color() != null) a.setColor(req.color());
         if (req.statementDay() != null) a.setStatementDay(req.statementDay());
         if (req.paymentDay() != null) a.setPaymentDay(req.paymentDay());
+        if (isBalanceManaged(a.getType()) && req.balance() != null) {
+            a.setBalance(req.balance());
+        }
         if (!isBalanceManaged(a.getType())) {
             a.setBalance(0L);
         }
