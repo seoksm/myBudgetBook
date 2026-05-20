@@ -37,6 +37,7 @@ export default function TransactionDetailPage() {
   const [occurredAt, setOccurredAt] = useState('');
 
   const { data: accounts } = useQuery({ queryKey: ['accounts'], queryFn: fetchAccounts });
+  const selectedAccount = accounts?.find((a) => a.id === accountId);
   const { data: categories } = useQuery({
     queryKey: ['categories', kind],
     queryFn: () => fetchCategories(kind === 'INCOME' ? 'INCOME' : 'EXPENSE'),
@@ -65,6 +66,9 @@ export default function TransactionDetailPage() {
       qc.invalidateQueries({ queryKey: ['accounts'] });
       navigate(backTo, { replace: true });
     },
+    onError: (error: Error) => {
+      alert(error.message);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -79,7 +83,15 @@ export default function TransactionDetailPage() {
 
   const submit = () => {
     if (!amount || !accountId) { alert('금액과 계좌를 입력해주세요'); return; }
-    if (kind !== 'TRANSFER' && !category) { alert('카테고리를 선택해주세요'); return; }
+    if (kind === 'TRANSFER') {
+      alert('이체는 거래 수정 화면에서 변경할 수 없습니다. 예금 간 이체 기능을 사용해주세요.');
+      return;
+    }
+    if (!category) { alert('카테고리를 선택해주세요'); return; }
+    if (kind === 'EXPENSE' && selectedAccount?.type === 'CHECK_CARD' && !selectedAccount.linkedDepositAccountId) {
+      alert('체크카드 지출을 저장하려면 자산 화면에서 연결 예금을 먼저 지정해주세요.');
+      return;
+    }
     updateMutation.mutate({
       kind, amount, accountId,
       categoryId: category?.id,
@@ -118,20 +130,25 @@ export default function TransactionDetailPage() {
         }
       />
 
-      <div className="grid grid-cols-3 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
-        {(['EXPENSE', 'INCOME', 'TRANSFER'] as TransactionKind[]).map((k) => (
+      {kind === 'TRANSFER' && (
+        <div className="rounded-lg border border-amber-100 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-700 dark:text-amber-300">
+          기존 이체 거래는 이 화면에서 수정할 수 없습니다. 앞으로의 이체는 거래 추가 화면의 이체 기능을 사용해주세요.
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+        {(['EXPENSE', 'INCOME'] as TransactionKind[]).map((k) => (
           <button
             key={k} type="button"
             onClick={() => { setKind(k); setCategory(undefined); }}
             className={`py-2 rounded-lg text-sm font-medium transition ${
               kind === k
                 ? k === 'INCOME' ? 'bg-emerald-500 text-white'
-                : k === 'EXPENSE' ? 'bg-rose-500 text-white'
-                : 'bg-sky-500 text-white'
+                : 'bg-rose-500 text-white'
                 : 'text-slate-600 dark:text-slate-300'
             }`}
           >
-            {k === 'INCOME' ? '수입' : k === 'EXPENSE' ? '지출' : '이체'}
+            {k === 'INCOME' ? '수입' : '지출'}
           </button>
         ))}
       </div>
@@ -166,6 +183,11 @@ export default function TransactionDetailPage() {
             </button>
           ))}
         </div>
+        {kind === 'EXPENSE' && selectedAccount?.type === 'CHECK_CARD' && !selectedAccount.linkedDepositAccountId && (
+          <div className="mt-2 text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900 rounded-lg p-3">
+            체크카드 지출을 저장하려면 자산 화면에서 연결 예금을 먼저 지정해야 합니다.
+          </div>
+        )}
       </div>
 
       {kind !== 'TRANSFER' && (
