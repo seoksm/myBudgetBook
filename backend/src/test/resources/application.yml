@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:budget_book_codex_test;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    defer-datasource-initialization: true
+    show-sql: false
+
+  sql:
+    init:
+      mode: always
+
+app:
+  auth:
+    jwt-secret: budget-book-codex-test-secret-change-me-2026
+    token-hours: 24

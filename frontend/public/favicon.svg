@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <!-- 배경 그라데이션 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+
+  <!-- 지갑 본체 -->
+  <rect x="232" y="320" width="560" height="400" rx="48"
+        fill="white" stroke="white" stroke-width="0"/>
+
+  <!-- 지갑 상단 (덮개) -->
+  <path d="M232 320 Q232 240 312 240 L712 240 Q792 240 792 320 L792 380 L232 380 Z"
+        fill="#0284c7"/>
+
+  <!-- 동전 슬롯 -->
+  <circle cx="704" cy="520" r="48" fill="#0ea5e9"/>
+  <circle cx="704" cy="520" r="24" fill="#0284c7"/>
+
+  <!-- 화폐 기호 ₩ -->
+  <text x="380" y="600" font-family="system-ui, -apple-system, sans-serif"
+        font-weight="900" font-size="240" fill="#0284c7">₩</text>
+</svg>
