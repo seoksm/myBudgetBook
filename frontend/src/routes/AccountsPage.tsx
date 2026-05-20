@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ListChecks, Plus, Pencil, Trash2 } from 'lucide-react';
 import {
-  fetchAccounts, createAccount, updateAccount, deleteAccount,
+  ListChecks, Plus, Pencil, RotateCcw, Trash2,
+} from 'lucide-react';
+import {
+  fetchAccounts, createAccount, updateAccount, deleteAccount, recalculateAccountBalances,
 } from '../api/accounts';
 import type { Account, AccountType } from '../api/types';
 import { PageHeader } from '../components/PageHeader';
@@ -33,10 +35,25 @@ export default function AccountsPage() {
     mutationFn: deleteAccount,
     onSuccess: invalidate,
   });
+  const recalculateMut = useMutation({
+    mutationFn: recalculateAccountBalances,
+    onSuccess: () => {
+      invalidate();
+      alert('잔액 재계산이 완료되었습니다.');
+    },
+    onError: (error: Error) => alert(error.message),
+  });
 
   const handleDelete = (a: Account) => {
     if (!confirm(`"${a.name}" 계좌를 삭제할까요?\n연결된 거래가 있으면 삭제 실패할 수 있습니다.`)) return;
     deleteMut.mutate(a.id);
+  };
+
+  const handleRecalculate = () => {
+    if (!confirm('전체 자산 잔액을 거래/이체 내역 기준으로 다시 계산할까요?\n계좌 생성 시 입력한 초기 잔액은 거래내역에 없으면 반영되지 않습니다.')) {
+      return;
+    }
+    recalculateMut.mutate();
   };
 
   return (
@@ -44,13 +61,25 @@ export default function AccountsPage() {
       <PageHeader
         title="자산"
         right={
-          <button
-            onClick={() => setEditing('new')}
-            className="bg-sky-600 text-white p-2 rounded-full"
-            aria-label="추가"
-          >
-            <Plus size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRecalculate}
+              disabled={recalculateMut.isPending}
+              className="p-2 rounded-full border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+              aria-label="잔액 재계산"
+              title="잔액 재계산"
+            >
+              <RotateCcw size={18} className={recalculateMut.isPending ? 'animate-spin' : undefined} />
+            </button>
+            <button
+              onClick={() => setEditing('new')}
+              className="bg-sky-600 text-white p-2 rounded-full"
+              aria-label="추가"
+              title="추가"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
         }
       />
 

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface AccountRepository extends JpaRepository<Account, Long> {
+    List<Account> findByUserIdOrderBySortOrderAsc(Long userId);
     List<Account> findByUserIdAndArchivedFalseOrderBySortOrderAsc(Long userId);
     List<Account> findByUserIdAndTypeAndArchivedFalse(Long userId, AccountType type);
     Optional<Account> findByIdAndUserId(Long id, Long userId);

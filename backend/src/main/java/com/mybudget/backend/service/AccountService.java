@@ -21,6 +21,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -94,6 +97,26 @@ public class AccountService {
         repo.delete(account);
     }
 
+    @Transactional
+    public List<AccountDto.Response> recalculateBalances() {
+        User user = AuthContext.requireUser();
+        List<Account> accounts = repo.findByUserIdOrderBySortOrderAsc(user.getId());
+        Map<Long, Account> accountById = accounts.stream()
+                .collect(Collectors.toMap(Account::getId, Function.identity()));
+
+        accounts.forEach(account -> account.setBalance(0L));
+
+        transactionRepo.findByUserIdOrderByOccurredAtAsc(user.getId())
+                .forEach(transaction -> applyTransactionBalance(transaction, accountById));
+        transferRepo.findByUserIdOrderByOccurredAtAsc(user.getId())
+                .forEach(transfer -> applyTransferBalance(transfer, accountById));
+
+        return accounts.stream()
+                .filter(account -> !Boolean.TRUE.equals(account.getArchived()))
+                .map(AccountDto.Response::from)
+                .toList();
+    }
+
     public List<AccountDto.ActivityResponse> activities(Long id, LocalDateTime from, LocalDateTime to) {
         User user = AuthContext.requireUser();
         Account account = repo.findByIdAndUserId(id, user.getId())
@@ -130,6 +153,58 @@ public class AccountService {
 
     private boolean isBalanceManaged(AccountType type) {
         return type != AccountType.CHECK_CARD && type != AccountType.CREDIT_CARD;
+    }
+
+    private void applyTransactionBalance(Transaction transaction, Map<Long, Account> accountById) {
+        Account balanceAccount = resolveTransactionBalanceAccount(transaction, accountById);
+        transaction.setBalanceAccount(balanceAccount);
+        if (balanceAccount == null) {
+            return;
+        }
+
+        long delta = switch (transaction.getKind()) {
+            case INCOME -> transaction.getAmount();
+            case EXPENSE -> -transaction.getAmount();
+            case TRANSFER -> 0L;
+        };
+        balanceAccount.setBalance(balanceAccount.getBalance() + delta);
+    }
+
+    private Account resolveTransactionBalanceAccount(Transaction transaction, Map<Long, Account> accountById) {
+        Account existingBalanceAccount = transaction.getBalanceAccount();
+        if (existingBalanceAccount != null) {
+            Account managed = accountById.get(existingBalanceAccount.getId());
+            if (managed != null && isBalanceManaged(managed.getType())) {
+                return managed;
+            }
+        }
+
+        Account account = accountById.get(transaction.getAccount().getId());
+        if (account == null) {
+            return null;
+        }
+        if (transaction.getKind() == TransactionKind.EXPENSE && account.getType() == AccountType.CHECK_CARD) {
+            Account linkedDeposit = account.getLinkedDepositAccount();
+            if (linkedDeposit == null) {
+                return null;
+            }
+            Account managedLinkedDeposit = accountById.get(linkedDeposit.getId());
+            return managedLinkedDeposit != null && isBalanceManaged(managedLinkedDeposit.getType())
+                    ? managedLinkedDeposit
+                    : null;
+        }
+        return isBalanceManaged(account.getType()) ? account : null;
+    }
+
+    private void applyTransferBalance(Transfer transfer, Map<Long, Account> accountById) {
+        Account from = accountById.get(transfer.getFromAccount().getId());
+        Account to = accountById.get(transfer.getToAccount().getId());
+        if (from != null && isBalanceManaged(from.getType())) {
+            from.setBalance(from.getBalance() - transfer.getAmount());
+        }
+        if (to != null && isBalanceManaged(to.getType())) {
+            to.setBalance(to.getBalance() + transfer.getAmount());
+        }
     }
 
     private AccountDto.ActivityResponse toTransactionActivity(Account account, Transaction t) {

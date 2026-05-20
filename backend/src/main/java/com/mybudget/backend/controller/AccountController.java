@@ -44,6 +44,12 @@ public class AccountController {
         return service.create(req);
     }
 
+    @PostMapping("/recalculate-balances")
+    @Operation(summary = "거래/이체 내역 기준 자산 잔액 재계산")
+    public List<AccountDto.Response> recalculateBalances() {
+        return service.recalculateBalances();
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "계좌 수정")
     public AccountDto.Response update(@PathVariable Long id,

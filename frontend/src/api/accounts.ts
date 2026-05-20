@@ -27,5 +27,8 @@ export const updateAccount = (id: number, data: {
 }) =>
   apiClient.put<Account>(`/accounts/${id}`, data).then((r) => r.data);
 
+export const recalculateAccountBalances = () =>
+  apiClient.post<Account[]>('/accounts/recalculate-balances').then((r) => r.data);
+
 export const deleteAccount = (id: number) =>
   apiClient.delete(`/accounts/${id}`);

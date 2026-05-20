@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TransferRepository extends JpaRepository<Transfer, Long> {
+    List<Transfer> findByUserIdOrderByOccurredAtAsc(Long userId);
     List<Transfer> findByUserIdAndOccurredAtBetweenOrderByOccurredAtDesc(
             Long userId, LocalDateTime from, LocalDateTime to);
     Optional<Transfer> findByIdAndUserId(Long id, Long userId);

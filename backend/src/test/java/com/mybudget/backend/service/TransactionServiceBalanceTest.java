@@ -8,11 +8,13 @@ import com.mybudget.backend.domain.CategoryKind;
 import com.mybudget.backend.domain.Transaction;
 import com.mybudget.backend.domain.TransactionKind;
 import com.mybudget.backend.domain.TransactionSource;
+import com.mybudget.backend.domain.Transfer;
 import com.mybudget.backend.domain.User;
 import com.mybudget.backend.dto.TransactionDto;
 import com.mybudget.backend.repository.AccountRepository;
 import com.mybudget.backend.repository.CategoryRepository;
 import com.mybudget.backend.repository.TransactionRepository;
+import com.mybudget.backend.repository.TransferRepository;
 import com.mybudget.backend.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,9 @@ class TransactionServiceBalanceTest {
     private TransactionService transactionService;
 
     @Autowired
+    private AccountService accountService;
+
+    @Autowired
     private UserRepository userRepo;
 
     @Autowired
@@ -41,6 +46,9 @@ class TransactionServiceBalanceTest {
 
     @Autowired
     private TransactionRepository transactionRepo;
+
+    @Autowired
+    private TransferRepository transferRepo;
 
     @AfterEach
     void tearDown() {
@@ -174,5 +182,119 @@ class TransactionServiceBalanceTest {
 
         assertThat(savedLivingExpense.getBalance()).isEqualTo(88_000L);
         assertThat(savedTransaction.getBalanceAccount().getId()).isEqualTo(livingExpense.getId());
+    }
+
+    @Test
+    void recalculateBalancesFromTransactionsAndTransfers() {
+        User user = userRepo.save(User.builder()
+                .email("recalculate-balance@example.com")
+                .passwordHash("hash")
+                .displayName("recalculate")
+                .build());
+        AuthContext.setUser(user);
+
+        Account livingExpense = accountRepo.save(Account.builder()
+                .user(user)
+                .name("생활비통장")
+                .type(AccountType.DEPOSIT)
+                .balance(999_999L)
+                .currency("KRW")
+                .archived(false)
+                .sortOrder(1)
+                .build());
+        Account savings = accountRepo.save(Account.builder()
+                .user(user)
+                .name("저축통장")
+                .type(AccountType.DEPOSIT)
+                .balance(888_888L)
+                .currency("KRW")
+                .archived(false)
+                .sortOrder(2)
+                .build());
+        Account checkCard = accountRepo.save(Account.builder()
+                .user(user)
+                .name("생활비 체크카드")
+                .type(AccountType.CHECK_CARD)
+                .linkedDepositAccount(livingExpense)
+                .balance(777_777L)
+                .currency("KRW")
+                .archived(false)
+                .sortOrder(3)
+                .build());
+        Account creditCard = accountRepo.save(Account.builder()
+                .user(user)
+                .name("신용카드")
+                .type(AccountType.CREDIT_CARD)
+                .balance(666_666L)
+                .currency("KRW")
+                .archived(false)
+                .sortOrder(4)
+                .build());
+        Category income = categoryRepo.save(Category.builder()
+                .user(user)
+                .name("월급")
+                .kind(CategoryKind.INCOME)
+                .archived(false)
+                .sortOrder(1)
+                .build());
+        Category expense = categoryRepo.save(Category.builder()
+                .user(user)
+                .name("식비")
+                .kind(CategoryKind.EXPENSE)
+                .archived(false)
+                .sortOrder(2)
+                .build());
+
+        transactionRepo.save(Transaction.builder()
+                .user(user)
+                .kind(TransactionKind.INCOME)
+                .amount(20_000L)
+                .account(livingExpense)
+                .balanceAccount(livingExpense)
+                .category(income)
+                .occurredAt(LocalDateTime.of(2026, 5, 20, 9, 0))
+                .source(TransactionSource.MANUAL)
+                .build());
+        Transaction legacyCheckCardExpense = transactionRepo.save(Transaction.builder()
+                .user(user)
+                .kind(TransactionKind.EXPENSE)
+                .amount(10_000L)
+                .account(checkCard)
+                .balanceAccount(null)
+                .category(expense)
+                .occurredAt(LocalDateTime.of(2026, 5, 20, 10, 0))
+                .source(TransactionSource.MANUAL)
+                .build());
+        transactionRepo.save(Transaction.builder()
+                .user(user)
+                .kind(TransactionKind.EXPENSE)
+                .amount(30_000L)
+                .account(creditCard)
+                .balanceAccount(null)
+                .category(expense)
+                .occurredAt(LocalDateTime.of(2026, 5, 20, 11, 0))
+                .source(TransactionSource.MANUAL)
+                .build());
+        transferRepo.save(Transfer.builder()
+                .user(user)
+                .fromAccount(livingExpense)
+                .toAccount(savings)
+                .amount(5_000L)
+                .occurredAt(LocalDateTime.of(2026, 5, 20, 12, 0))
+                .build());
+
+        accountService.recalculateBalances();
+
+        Account savedLivingExpense = accountRepo.findById(livingExpense.getId()).orElseThrow();
+        Account savedSavings = accountRepo.findById(savings.getId()).orElseThrow();
+        Account savedCheckCard = accountRepo.findById(checkCard.getId()).orElseThrow();
+        Account savedCreditCard = accountRepo.findById(creditCard.getId()).orElseThrow();
+        Transaction savedLegacyCheckCardExpense = transactionRepo.findById(legacyCheckCardExpense.getId()).orElseThrow();
+
+        assertThat(savedLivingExpense.getBalance()).isEqualTo(5_000L);
+        assertThat(savedSavings.getBalance()).isEqualTo(5_000L);
+        assertThat(savedCheckCard.getBalance()).isZero();
+        assertThat(savedCreditCard.getBalance()).isZero();
+        assertThat(savedLegacyCheckCardExpense.getBalanceAccount().getId()).isEqualTo(livingExpense.getId());
     }
 }
